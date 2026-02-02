@@ -1,5 +1,6 @@
 # alpha_scorer.py
-import os, json, requests
+import os, json, requests, smtplib
+from email.message import EmailMessage
 
 KALSHI_KEY = os.getenv("KALSHI_KEY")
 HF_TOKEN    = os.getenv("HF_TOKEN")
@@ -23,12 +24,12 @@ def alpha_score(mkt):
     return (1.0 * volume) / (price + 0.01)
 
 def get_research(question):
-    prompt = f"Summarize this in 1 sentence: {question}"
+    prompt = f"Summarize: {question}"
     
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     payload = {"inputs": prompt}
     
-    # Try a more reliable free model
+    # Use a smaller, free model
     url = "https://router.huggingface.co/google/flan-t5-small"
     
     resp = requests.post(url, json=payload, headers=headers)
@@ -61,29 +62,20 @@ def send_email(picks, recipient):
 
 """
 
-    # Brevo API with correct format
-    url = "https://api.brevo.com/v3/smtp/email"
+    msg = EmailMessage()
+    msg["Subject"] = "🤑 Kalshi Alpha Picks"
+    msg["From"] = "Kalshi Bot <bot@kalshi.bot>"
+    msg["To"] = recipient
+    msg.set_content(body)
     
-    data = {
-        "sender": {"name": "Kalshi Bot", "email": "bot@kalshi.bot"},
-        "to": [{"email": recipient, "name": "Architect"}],
-        "subject": "🤑 Kalshi Alpha Picks",
-        "textContent": body
-    }
+    print(f"DEBUG: Sending email to {recipient} via Brevo SMTP")
     
-    headers = {"api-key": BREVO_API_KEY}
+    # Brevo SMTP
+    with smtplib.SMTP("smtp-relay.brevo.com", 587) as smtp:
+        smtp.login(BREVO_API_KEY, "")  # API key as username, empty password
+        smtp.send_message(msg)
     
-    print(f"DEBUG: Sending email to {recipient} via Brevo")
-    print(f"DEBUG: Using API key starting with {BREVO_API_KEY[:10]}...")
-    
-    resp = requests.post(url, json=data, headers=headers)
-    
-    print(f"DEBUG: Brevo response {resp.status_code}: {resp.text[:200]}")
-    
-    if resp.status_code in [200, 201]:
-        print("DEBUG: Email sent successfully!")
-    else:
-        print("DEBUG: Email failed!")
+    print("DEBUG: Email sent!")
 
 # ------------------------------------------------------------------
 if __name__ == "__main__":
