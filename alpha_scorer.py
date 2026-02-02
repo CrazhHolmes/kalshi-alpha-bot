@@ -16,14 +16,21 @@ if CLAUDE_KEY:
 if EMAIL_PASS:
     EMAIL_PASS = EMAIL_PASS.strip()
 
+print(f"DEBUG: KALSHI_KEY starts with '{KALSHI_KEY[:10]}...'" if KALSHI_KEY else "DEBUG: KALSHI_KEY is None")
+print(f"DEBUG: CLAUDE_KEY starts with '{CLAUDE_KEY[:10]}...'" if CLAUDE_KEY else "DEBUG: CLAUDE_KEY is None")
+print(f"DEBUG: EMAIL_USER = {EMAIL_USER}")
+
 # ------------------------------------------------------------------
 # 1️⃣ Pull markets from Kalshi Demo
 def fetch_markets():
     url = "https://demo-api.kalshi.co/trade-api/v2/markets"
     headers = {"Authorization": f"Bearer {KALSHI_KEY}"}
+    print(f"DEBUG: Fetching {url}")
     resp = requests.get(url, headers=headers)
+    print(f"DEBUG: Response status = {resp.status_code}")
     resp.raise_for_status()
     data = resp.json()
+    print(f"DEBUG: Found {len(data.get('markets', []))} markets")
     return data.get("markets", [])
 
 # 2️⃣ Simple alpha score
@@ -43,8 +50,10 @@ def get_research(question):
                "max_tokens": 200,
                "temperature": 0.0,
                "messages": [{"role":"user","content":prompt}]}
+    print(f"DEBUG: Sending to Claude: {question[:50]}...")
     resp = requests.post("https://api.anthropic.com/v1/messages",
                          json=payload, headers=headers)
+    print(f"DEBUG: Claude response status = {resp.status_code}")
     resp.raise_for_status()
     return resp.json()["content"][0]["text"]
 
@@ -73,15 +82,23 @@ def send_email(picks):
 """
     msg.set_content(body)
 
+    print(f"DEBUG: Sending email to {RECIPIENT}")
     with smtplib.SMTP("smtp.tutanota.com", 587) as smtp:
         smtp.starttls()
         smtp.login(EMAIL_USER, EMAIL_PASS)
         smtp.send_message(msg)
+    print(f"DEBUG: Email sent successfully")
 
 # ------------------------------------------------------------------
 if __name__ == "__main__":
-    markets = fetch_markets()
-    scored   = [(m, alpha_score(m)) for m in markets]
-    scored.sort(key=lambda x: x[1], reverse=True)
-    top3 = scored[:3]
-    send_email(top3)
+    try:
+        markets = fetch_markets()
+        scored   = [(m, alpha_score(m)) for m in markets]
+        scored.sort(key=lambda x: x[1], reverse=True)
+        top3 = scored[:3]
+        print(f"DEBUG: Top 3 markets selected")
+        send_email(top3)
+        print("DEBUG: Done!")
+    except Exception as e:
+        print(f"ERROR: {type(e).__name__}: {e}")
+        raise
