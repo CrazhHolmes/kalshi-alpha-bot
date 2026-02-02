@@ -8,7 +8,7 @@ EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASS = os.getenv("EMAIL_PASS")
 RECIPIENT   = os.getenv("RECIPIENT")
 
-# Strip whitespace from API keys (prevents header errors)
+# Strip whitespace from API keys
 if KALSHI_KEY:
     KALSHI_KEY = KALSHI_KEY.strip()
 if CLAUDE_KEY:
@@ -16,22 +16,22 @@ if CLAUDE_KEY:
 if EMAIL_PASS:
     EMAIL_PASS = EMAIL_PASS.strip()
 
-print(f"DEBUG: KALSHI_KEY starts with '{KALSHI_KEY[:10]}...'" if KALSHI_KEY else "DEBUG: KALSHI_KEY is None")
-print(f"DEBUG: CLAUDE_KEY starts with '{CLAUDE_KEY[:10]}...'" if CLAUDE_KEY else "DEBUG: CLAUDE_KEY is None")
-print(f"DEBUG: EMAIL_USER = {EMAIL_USER}")
-
 # ------------------------------------------------------------------
 # 1️⃣ Pull markets from Kalshi Demo
 def fetch_markets():
     url = "https://demo-api.kalshi.co/trade-api/v2/markets"
     headers = {"Authorization": f"Bearer {KALSHI_KEY}"}
-    print(f"DEBUG: Fetching {url}")
     resp = requests.get(url, headers=headers)
-    print(f"DEBUG: Response status = {resp.status_code}")
     resp.raise_for_status()
     data = resp.json()
-    print(f"DEBUG: Found {len(data.get('markets', []))} markets")
-    return data.get("markets", [])
+    markets = data.get("markets", [])
+    
+    # Debug: print the first market's keys
+    if markets:
+        print(f"DEBUG: First market keys = {list(markets[0].keys())}")
+        print(f"DEBUG: First market = {json.dumps(markets[0], indent=2)[:500]}")
+    
+    return markets
 
 # 2️⃣ Simple alpha score
 def alpha_score(mkt):
@@ -50,10 +50,8 @@ def get_research(question):
                "max_tokens": 200,
                "temperature": 0.0,
                "messages": [{"role":"user","content":prompt}]}
-    print(f"DEBUG: Sending to Claude: {question[:50]}...")
     resp = requests.post("https://api.anthropic.com/v1/messages",
                          json=payload, headers=headers)
-    print(f"DEBUG: Claude response status = {resp.status_code}")
     resp.raise_for_status()
     return resp.json()["content"][0]["text"]
 
@@ -66,8 +64,9 @@ def send_email(picks):
 
     body = "Here are the three contracts the bot thinks are most mis-priced:\n\n"
     for i, (mkt, score) in enumerate(picks, 1):
-        q   = mkt["question"]
-        slug = mkt.get("slug", "")
+        # Handle different possible field names for the market question
+        q = mkt.get("question") or mkt.get("title") or mkt.get("name") or mkt.get("description") or "Unknown market"
+        slug = mkt.get("slug") or mkt.get("id") or ""
         url = f"https://demo.kalshi.co/market/{slug}"
         price = mkt.get("current_price", 0)
         payout = mkt.get("payout", 1.0)
@@ -82,12 +81,10 @@ def send_email(picks):
 """
     msg.set_content(body)
 
-    print(f"DEBUG: Sending email to {RECIPIENT}")
     with smtplib.SMTP("smtp.tutanota.com", 587) as smtp:
         smtp.starttls()
         smtp.login(EMAIL_USER, EMAIL_PASS)
         smtp.send_message(msg)
-    print(f"DEBUG: Email sent successfully")
 
 # ------------------------------------------------------------------
 if __name__ == "__main__":
