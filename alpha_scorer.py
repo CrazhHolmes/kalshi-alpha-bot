@@ -1,12 +1,10 @@
 # alpha_scorer.py
-import os, json, requests, smtplib
-from email.message import EmailMessage
+import os, json, requests
 
 KALSHI_KEY = os.getenv("KALSHI_KEY")
-EMAIL_USER = os.getenv("EMAIL_USER")
-EMAIL_PASS = os.getenv("EMAIL_PASS")
-RECIPIENT   = os.getenv("RECIPIENT")
 HF_TOKEN    = os.getenv("HF_TOKEN")
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+RECIPIENT   = os.getenv("RECIPIENT")
 
 if KALSHI_KEY:
     KALSHI_KEY = KALSHI_KEY.strip()
@@ -62,20 +60,37 @@ def send_email(picks, recipient):
 
 """
 
-    msg = EmailMessage()
-    msg["Subject"] = "🤑 Kalshi Alpha Picks"
-    msg["From"] = EMAIL_USER
-    msg["To"] = recipient
-    msg.set_content(body)
+    # Send via Brevo API
+    url = "https://api.brevo.com/v3/smtp/email"
     
-    print(f"DEBUG: Sending email to {recipient} via Tutanota (port 465 SSL)")
+    data = {
+        "sender": {
+            "name": "Kalshi Bot",
+            "email": "bot@example.com"
+        },
+        "to": [
+            {
+                "email": recipient,
+                "name": "Architect"
+            }
+        ],
+        "subject": "🤑 Kalshi Alpha Picks",
+        "textContent": body
+    }
     
-    # Tutanota with port 465 (SSL)
-    with smtplib.SMTP_SSL("smtp.tutanota.com", 465) as smtp:
-        smtp.login(EMAIL_USER, EMAIL_PASS)
-        smtp.send_message(msg)
+    headers = {
+        "api-key": BREVO_API_KEY,
+        "Content-Type": "application/json"
+    }
     
-    print("DEBUG: Email sent!")
+    print(f"DEBUG: Sending email to {recipient} via Brevo")
+    
+    resp = requests.post(url, json=data, headers=headers)
+    
+    if resp.status_code == 201:
+        print("DEBUG: Email sent successfully!")
+    else:
+        print(f"DEBUG: Brevo error {resp.status_code}: {resp.text}")
 
 # ------------------------------------------------------------------
 if __name__ == "__main__":
