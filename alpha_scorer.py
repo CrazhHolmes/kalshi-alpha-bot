@@ -8,6 +8,14 @@ EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASS = os.getenv("EMAIL_PASS")
 RECIPIENT   = os.getenv("RECIPIENT")
 
+# Strip whitespace from API keys (prevents header errors)
+if KALSHI_KEY:
+    KALSHI_KEY = KALSHI_KEY.strip()
+if CLAUDE_KEY:
+    CLAUDE_KEY = CLAUDE_KEY.strip()
+if EMAIL_PASS:
+    EMAIL_PASS = EMAIL_PASS.strip()
+
 # ------------------------------------------------------------------
 # 1️⃣ Pull markets from Kalshi Demo
 def fetch_markets():
@@ -25,7 +33,7 @@ def alpha_score(mkt):
     volume = mkt.get("volume", 0)
     return (payout * volume) / (price + 0.01)
 
-# 3️⃣ Ask Claude for 3‑sentence research
+# 3️⃣ Ask Claude for 3-sentence research
 def get_research(question):
     prompt = f"""Summarize the key facts, recent news and major risks for this prediction market question in three short sentences:\n\n"{question}"\n\nKeep it concise and neutral."""
     headers = {"x-api-key": CLAUDE_KEY,
