@@ -45,7 +45,7 @@ def get_research(question):
         return result[0].get("generated_text", "").strip()
     return str(result)
 
-def send_email(picks):
+def send_email(picks, recipient):
     body = "🤑 Tonight's Kalshi Alpha Picks (Demo)\n\n"
     
     for i, (mkt, score) in enumerate(picks, 1):
@@ -65,14 +65,13 @@ def send_email(picks):
     msg = EmailMessage()
     msg["Subject"] = "🤑 Kalshi Alpha Picks"
     msg["From"] = EMAIL_USER
-    msg["To"] = RECIPIENT
+    msg["To"] = recipient
     msg.set_content(body)
     
-    print(f"DEBUG: Sending email to {RECIPIENT} via Tutanota")
+    print(f"DEBUG: Sending email to {recipient} via Tutanota (port 465 SSL)")
     
-    # TUTANOTA SMTP (not Gmail)
-    with smtplib.SMTP("smtp.tutanota.com", 587) as smtp:
-        smtp.starttls()
+    # Tutanota with port 465 (SSL)
+    with smtplib.SMTP_SSL("smtp.tutanota.com", 465) as smtp:
         smtp.login(EMAIL_USER, EMAIL_PASS)
         smtp.send_message(msg)
     
@@ -83,5 +82,5 @@ if __name__ == "__main__":
     markets = fetch_markets()
     scored = sorted([(m, alpha_score(m)) for m in markets], key=lambda x: x[1], reverse=True)[:3]
     print(f"DEBUG: Top 3 selected")
-    send_email(scored)
+    send_email(scored, RECIPIENT)
     print("DEBUG: Done!")
