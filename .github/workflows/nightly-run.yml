@@ -1,0 +1,31 @@
+name: Nightly Alpha Scan (Demo)
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # 02:00 UTC daily (10 PM EST)
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Execute scorer
+        env:
+          KALSHI_KEY: ${{ secrets.KALSHI_KEY }}
+          CLAUDE_KEY: ${{ secrets.CLAUDE_KEY }}
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          RECIPIENT: ${{ secrets.RECIPIENT }}
+        run: python alpha_scorer.py
