@@ -6,7 +6,7 @@ KALSHI_KEY = os.getenv("KALSHI_KEY")
 EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASS = os.getenv("EMAIL_PASS")
 RECIPIENT   = os.getenv("RECIPIENT")
-HF_TOKEN    = os.getenv("HF_TOKEN")  # Free Hugging Face token
+HF_TOKEN    = os.getenv("HF_TOKEN")
 
 if KALSHI_KEY:
     KALSHI_KEY = KALSHI_KEY.strip()
@@ -25,25 +25,19 @@ def alpha_score(mkt):
     return (1.0 * volume) / (price + 0.01)
 
 def get_research(question):
-    """Free Hugging Face model for research summary"""
-    prompt = f"""Summarize this prediction market question in 2-3 short sentences: "{question}" """
+    prompt = f"""Summarize this prediction market question in 2 sentences: "{question}" """
     
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    payload = {
-        "inputs": prompt,
-        "parameters": {"max_new_tokens": 100, "temperature": 0.3}
-    }
+    payload = {"inputs": prompt, "parameters": {"max_new_tokens": 80}}
     
-    url = "https://api-inference.huggingface.co/models/meta-llama/Llama-3-8B-Instruct"
+    url = "https://router.huggingface.co/meta-llama/Llama-3-8B-Instruct"
     
     resp = requests.post(url, json=payload, headers=headers)
     
     if resp.status_code == 429:
-        print("DEBUG: HF rate limited, skipping research")
-        return "(Rate limited - skipping research)"
-    
+        return "(Rate limited)"
     if resp.status_code != 200:
-        print(f"DEBUG: HF error {resp.status_code}: {resp.text[:200]}")
+        print(f"DEBUG: HF error {resp.status_code}")
         return "(Research unavailable)"
     
     result = resp.json()
@@ -59,13 +53,10 @@ def send_email(picks):
         slug = mkt.get("ticker", mkt.get("event_ticker", ""))
         url = f"https://demo.kalshi.co/market/{slug}"
         price = mkt.get("last_price", 0)
-        
-        # Get free research from Hugging Face
         research = get_research(q)
         
         body += f"""{i}. {q}
-   Price: ${price:.2f} | Payout: $1.00
-   Alpha: {score:.2f}
+   Price: ${price:.2f} | Alpha: {score:.2f}
    Research: {research}
    Link: {url}
 
@@ -77,10 +68,14 @@ def send_email(picks):
     msg["To"] = RECIPIENT
     msg.set_content(body)
     
-    print(f"DEBUG: Sending email to {RECIPIENT}")
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+    print(f"DEBUG: Sending email to {RECIPIENT} via Tutanota")
+    
+    # TUTANOTA SMTP (not Gmail)
+    with smtplib.SMTP("smtp.tutanota.com", 587) as smtp:
+        smtp.starttls()
         smtp.login(EMAIL_USER, EMAIL_PASS)
         smtp.send_message(msg)
+    
     print("DEBUG: Email sent!")
 
 # ------------------------------------------------------------------
