@@ -23,12 +23,13 @@ def alpha_score(mkt):
     return (1.0 * volume) / (price + 0.01)
 
 def get_research(question):
-    prompt = f"""Summarize this prediction market question in 2 sentences: "{question}" """
+    prompt = f"Summarize this in 1 sentence: {question}"
     
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    payload = {"inputs": prompt, "parameters": {"max_new_tokens": 80}}
+    payload = {"inputs": prompt}
     
-    url = "https://router.huggingface.co/meta-llama/Llama-3-8B-Instruct"
+    # Try a more reliable free model
+    url = "https://router.huggingface.co/google/flan-t5-small"
     
     resp = requests.post(url, json=payload, headers=headers)
     
@@ -60,37 +61,29 @@ def send_email(picks, recipient):
 
 """
 
-    # Send via Brevo API
+    # Brevo API with correct format
     url = "https://api.brevo.com/v3/smtp/email"
     
     data = {
-        "sender": {
-            "name": "Kalshi Bot",
-            "email": "bot@example.com"
-        },
-        "to": [
-            {
-                "email": recipient,
-                "name": "Architect"
-            }
-        ],
+        "sender": {"name": "Kalshi Bot", "email": "bot@kalshi.bot"},
+        "to": [{"email": recipient, "name": "Architect"}],
         "subject": "🤑 Kalshi Alpha Picks",
         "textContent": body
     }
     
-    headers = {
-        "api-key": BREVO_API_KEY,
-        "Content-Type": "application/json"
-    }
+    headers = {"api-key": BREVO_API_KEY}
     
     print(f"DEBUG: Sending email to {recipient} via Brevo")
+    print(f"DEBUG: Using API key starting with {BREVO_API_KEY[:10]}...")
     
     resp = requests.post(url, json=data, headers=headers)
     
-    if resp.status_code == 201:
+    print(f"DEBUG: Brevo response {resp.status_code}: {resp.text[:200]}")
+    
+    if resp.status_code in [200, 201]:
         print("DEBUG: Email sent successfully!")
     else:
-        print(f"DEBUG: Brevo error {resp.status_code}: {resp.text}")
+        print("DEBUG: Email failed!")
 
 # ------------------------------------------------------------------
 if __name__ == "__main__":
