@@ -8,7 +8,7 @@ EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASS = os.getenv("EMAIL_PASS")
 RECIPIENT   = os.getenv("RECIPIENT")
 
-# Strip whitespace from API keys
+# Strip whitespace
 if KALSHI_KEY:
     KALSHI_KEY = KALSHI_KEY.strip()
 if CLAUDE_KEY:
@@ -25,33 +25,42 @@ def fetch_markets():
     resp.raise_for_status()
     data = resp.json()
     markets = data.get("markets", [])
-    
-    # Debug: print the first market's keys
-    if markets:
-        print(f"DEBUG: First market keys = {list(markets[0].keys())}")
-        print(f"DEBUG: First market = {json.dumps(markets[0], indent=2)[:500]}")
-    
+    print(f"DEBUG: Found {len(markets)} markets")
     return markets
 
 # 2️⃣ Simple alpha score
 def alpha_score(mkt):
-    price = mkt.get("current_price", 0.5)
-    payout = mkt.get("payout", 1.0)
+    price = mkt.get("last_price", 0.5)  # Demo API uses "last_price"
+    payout = 1.0
     volume = mkt.get("volume", 0)
     return (payout * volume) / (price + 0.01)
 
 # 3️⃣ Ask Claude for 3-sentence research
 def get_research(question):
-    prompt = f"""Summarize the key facts, recent news and major risks for this prediction market question in three short sentences:\n\n"{question}"\n\nKeep it concise and neutral."""
-    headers = {"x-api-key": CLAUDE_KEY,
-               "Content-Type": "application/json",
-               "anthropic-version": "2023-06-01"}
-    payload = {"model": "claude-3-haiku-20240307",
-               "max_tokens": 200,
-               "temperature": 0.0,
-               "messages": [{"role":"user","content":prompt}]}
+    prompt = f"""Summarize the key facts, recent news and major risks for this prediction market question in three short sentences: "{question}" """
+    
+    headers = {
+        "x-api-key": CLAUDE_KEY,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": "haiku-3-20250514",
+        "max_tokens": 150,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ]
+    }
+    
+    print(f"DEBUG: Sending to Claude (key starts with {CLAUDE_KEY[:10]}...)")
+    
     resp = requests.post("https://api.anthropic.com/v1/messages",
                          json=payload, headers=headers)
+    
+    print(f"DEBUG: Claude response status = {resp.status_code}")
+    print(f"DEBUG: Claude response body = {resp.text[:300]}")
+    
     resp.raise_for_status()
     return resp.json()["content"][0]["text"]
 
@@ -64,38 +73,44 @@ def send_email(picks):
 
     body = "Here are the three contracts the bot thinks are most mis-priced:\n\n"
     for i, (mkt, score) in enumerate(picks, 1):
-        # Handle different possible field names for the market question
-        q = mkt.get("question") or mkt.get("title") or mkt.get("name") or mkt.get("description") or "Unknown market"
-        slug = mkt.get("slug") or mkt.get("id") or ""
+        q = mkt.get("title", "Unknown market")
+        slug = mkt.get("ticker", mkt.get("event_ticker", ""))
         url = f"https://demo.kalshi.co/market/{slug}"
-        price = mkt.get("current_price", 0)
-        payout = mkt.get("payout", 1.0)
-        research = get_research(q)
+        price = mkt.get("last_price", 0)
+        
+        try:
+            research = get_research(q)
+        except Exception as e:
+            research = f"Error getting research: {e}"
+        
         body += f"""
 {i}. {q}
    • Current price: ${price:.2f}
-   • Payout if correct: ${payout:.2f}
+   • Payout if correct: $1.00
    • Alpha score: {score:.2f}
    • Research: {research}
    • Link: {url}
 """
     msg.set_content(body)
 
+    print(f"DEBUG: Sending email to {RECIPIENT}")
     with smtplib.SMTP("smtp.tutanota.com", 587) as smtp:
         smtp.starttls()
         smtp.login(EMAIL_USER, EMAIL_PASS)
         smtp.send_message(msg)
+    print(f"DEBUG: Email sent!")
 
 # ------------------------------------------------------------------
 if __name__ == "__main__":
     try:
         markets = fetch_markets()
-        scored   = [(m, alpha_score(m)) for m in markets]
+        scored = [(m, alpha_score(m)) for m in markets]
         scored.sort(key=lambda x: x[1], reverse=True)
         top3 = scored[:3]
-        print(f"DEBUG: Top 3 markets selected")
+        print(f"DEBUG: Top 3 selected")
         send_email(top3)
-        print("DEBUG: Done!")
+        print("DEBUG: All done!")
     except Exception as e:
         print(f"ERROR: {type(e).__name__}: {e}")
-        raise
+        import traceback
+        traceback.print_exc()
