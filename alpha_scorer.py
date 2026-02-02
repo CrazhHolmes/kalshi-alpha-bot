@@ -4,7 +4,7 @@ from email.message import EmailMessage
 
 KALSHI_KEY = os.getenv("KALSHI_KEY")
 HF_TOKEN    = os.getenv("HF_TOKEN")
-BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+BREVO_SMTP_KEY = os.getenv("BREVO_SMTP_KEY")
 RECIPIENT   = os.getenv("RECIPIENT")
 
 if KALSHI_KEY:
@@ -29,7 +29,6 @@ def get_research(question):
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     payload = {"inputs": prompt}
     
-    # Use a smaller, free model
     url = "https://router.huggingface.co/google/flan-t5-small"
     
     resp = requests.post(url, json=payload, headers=headers)
@@ -68,11 +67,11 @@ def send_email(picks, recipient):
     msg["To"] = recipient
     msg.set_content(body)
     
-    print(f"DEBUG: Sending email to {recipient} via Brevo SMTP")
+    print(f"DEBUG: Sending email to {recipient}")
     
-    # Brevo SMTP
+    # Brevo SMTP with your key
     with smtplib.SMTP("smtp-relay.brevo.com", 587) as smtp:
-        smtp.login(BREVO_API_KEY, "")  # API key as username, empty password
+        smtp.login(BREVO_SMTP_KEY, "")
         smtp.send_message(msg)
     
     print("DEBUG: Email sent!")
