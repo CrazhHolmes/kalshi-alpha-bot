@@ -70,6 +70,11 @@ def send_email(picks, recipient):
     except Exception as e:
         print(f"ERROR: {type(e).__name__}: {e}")
 
+- name: Test secrets
+  run: |
+    python -c "import os; print('BREVO_SMTP_KEY:', os.getenv('BREVO_SMTP_KEY'))"
+
+
 # ------------------------------------------------------------------
 if __name__ == "__main__":
     markets = fetch_markets()
